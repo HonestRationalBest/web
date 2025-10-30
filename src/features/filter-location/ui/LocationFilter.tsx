@@ -17,6 +17,7 @@ export function LocationFilter({ onClose, searchValue: externalSearchValue, onSe
   const { data: boundaries, isLoading: loading, error: errorObj } = usePopularBoundaries();
   const { data: allBoundaries, isLoading: loadingAll, error: errorAllObj } = useAllBoundaries();
   const { withinId, setWithinId, setNear, setBbox } = useFiltersStore();
+  const { setDraftWithinId } = useFiltersStore() as any;
   const searchValue = externalSearchValue || "";
 
   const error = errorObj ? String(errorObj) : null;
@@ -26,9 +27,11 @@ export function LocationFilter({ onClose, searchValue: externalSearchValue, onSe
   const otherBoundaries = allBoundaries?.filter((b) => !popularIds.has(b.id)) || [];
 
   const allLocations = [...(boundaries || []), ...otherBoundaries];
+  const draftGlobal = (useFiltersStore.getState() as any).draftWithinId as string[] | undefined;
+  const sourceIdsGlobal = (draftGlobal && draftGlobal.length > 0 ? draftGlobal : withinId);
   const selectedCity = allLocations.find((city) => {
-    if (withinId.includes(city.id)) return true;
-    return city.children?.some((child) => withinId.includes(child.id));
+    if (sourceIdsGlobal.includes(city.id)) return true;
+    return city.children?.some((child) => sourceIdsGlobal.includes(child.id));
   }) || null;
 
   const handleCityClick = (cityId: string) => {
@@ -43,9 +46,9 @@ export function LocationFilter({ onClose, searchValue: externalSearchValue, onSe
 
     if (targetBoundary.children && targetBoundary.children.length > 0) {
       const childIds = targetBoundary.children.map((child) => child.id);
-      setWithinId(childIds);
+      setDraftWithinId(childIds);
     } else {
-      setWithinId([cityId]);
+      setDraftWithinId([cityId]);
     }
   };
 
@@ -59,13 +62,15 @@ export function LocationFilter({ onClose, searchValue: externalSearchValue, onSe
     setNear(undefined);
     setBbox(undefined);
 
-    const withoutCity = withinId.filter((id) => id !== cityId);
+    const draft = (useFiltersStore.getState() as any).draftWithinId as string[] | undefined;
+    const sourceIds = (draft && draft.length > 0 ? draft : withinId);
+    const withoutCity = sourceIds.filter((id) => id !== cityId);
 
     if (withinId.includes(districtId)) {
       const newIds = withoutCity.filter((id) => id !== districtId);
-      setWithinId(newIds.length > 0 ? newIds : [cityId]);
+      setDraftWithinId(newIds.length > 0 ? newIds : [cityId]);
     } else {
-      setWithinId([...withoutCity, districtId]);
+      setDraftWithinId([...withoutCity, districtId]);
     }
   };
 
@@ -78,24 +83,30 @@ export function LocationFilter({ onClose, searchValue: externalSearchValue, onSe
     setNear(undefined);
     setBbox(undefined);
 
+    const draft = (useFiltersStore.getState() as any).draftWithinId as string[] | undefined;
+    const sourceIds = (draft && draft.length > 0 ? draft : withinId);
     const allDistrictIds = selectedCity.children.map((c) => c.id);
-    const hasAllDistricts = allDistrictIds.every((id) => withinId.includes(id));
+    const hasAllDistricts = allDistrictIds.every((id) => sourceIds.includes(id));
 
     if (hasAllDistricts) {
-      setWithinId([selectedCity.id]);
+      setDraftWithinId([selectedCity.id]);
     } else {
-      setWithinId(allDistrictIds);
+      setDraftWithinId(allDistrictIds);
     }
   };
 
-  const showingDistricts = selectedCity && !withinId.includes(selectedCity.id);
+  const showingDistricts = selectedCity && !sourceIdsGlobal.includes(selectedCity.id);
+  const draftIds = (useFiltersStore.getState() as any).draftWithinId as string[] | undefined;
+  const sourceIds = (draftIds && draftIds.length > 0 ? draftIds : withinId);
   const selectedDistrictIds = showingDistricts
-    ? withinId.filter((id) => selectedCity.children?.some((c) => c.id === id))
+    ? sourceIds.filter((id) => selectedCity.children?.some((c) => c.id === id))
     : [];
 
   const getSelectedDistrictCount = (city: any) => {
-    if (withinId.includes(city.id)) return 0;
-    return city.children?.filter((c: any) => withinId.includes(c.id)).length || 0;
+    const draft = (useFiltersStore.getState() as any).draftWithinId as string[] | undefined;
+    const sourceIds = (draft && draft.length > 0 ? draft : withinId);
+    if (sourceIds.includes(city.id)) return 0;
+    return city.children?.filter((c: any) => sourceIds.includes(c.id)).length || 0;
   };
 
   const handleAddressSelect = useCallback((result: any) => {
@@ -141,7 +152,7 @@ export function LocationFilter({ onClose, searchValue: externalSearchValue, onSe
             <div className={styles.cityGrid}>
               {boundaries.map((city) => {
                 const districtCount = getSelectedDistrictCount(city);
-                const isSelected = withinId.includes(city.id) || districtCount > 0;
+                const isSelected = sourceIdsGlobal.includes(city.id) || districtCount > 0;
 
                 return (
                   <div
@@ -175,7 +186,7 @@ export function LocationFilter({ onClose, searchValue: externalSearchValue, onSe
                 const districtCount = getSelectedDistrictCount(state);
                 const totalDistricts = state.children?.length ?? 0;
                 const areAllDistrictsSelected = totalDistricts > 0 && districtCount === totalDistricts;
-                const isSelected = withinId.includes(state.id) || districtCount > 0;
+                const isSelected = sourceIdsGlobal.includes(state.id) || districtCount > 0;
 
                 return (
                   <div
@@ -233,7 +244,7 @@ export function LocationFilter({ onClose, searchValue: externalSearchValue, onSe
                   onClick={() => handleDistrictToggle(district.id)}
                 >
                   <Checkbox
-                    checked={withinId.includes(district.id)}
+                    checked={sourceIdsGlobal.includes(district.id)}
                     onChange={() => handleDistrictToggle(district.id)}
                     label={district.name}
                     id={`district-${district.id}`}

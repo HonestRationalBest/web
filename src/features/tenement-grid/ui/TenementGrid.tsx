@@ -33,15 +33,16 @@ export function TenementGrid() {
   const error = searchError ? String(searchError) : null;
 
   const locationName = useMemo(() => {
-    if (withinId.length > 0 && (boundaries || allBoundaries)) {
+    const activeIds: string[] = withinId;
+    if (activeIds.length > 0 && (boundaries || allBoundaries)) {
       const allLocations = [...(boundaries || []), ...(allBoundaries || [])];
       
       const matchedLocationMap = new Map<string, string>();
       
       allLocations.forEach(loc => {
         const locationName = loc.altName || loc.name;
-        const isCitySelected = withinId.includes(loc.id);
-        const hasDistrictsSelected = loc.children?.some(child => withinId.includes(child.id)) || false;
+        const isCitySelected = activeIds.includes(loc.id);
+        const hasDistrictsSelected = loc.children?.some(child => activeIds.includes(child.id)) || false;
         
         if (isCitySelected || hasDistrictsSelected) {
           if (!matchedLocationMap.has(locationName.toLowerCase())) {
@@ -57,12 +58,7 @@ export function TenementGrid() {
         return `${uniqueNames.slice(0, 2).join(", ")} and ${uniqueNames.length - 2} more`;
       }
     }
-
-    const cities = Array.from(new Set(tenements.map(t => t.city).filter(Boolean)));
-    if (cities.length === 0) return null;
-    if (cities.length === 1) return cities[0];
-    if (cities.length <= 3) return cities.join(", ");
-    return `${cities.slice(0, 2).join(", ")} and ${cities.length - 2} more`;
+    return null;
   }, [withinId, boundaries, allBoundaries, tenements]);
 
   if (loading) {

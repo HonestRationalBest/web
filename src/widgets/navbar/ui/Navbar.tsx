@@ -3,6 +3,7 @@
 import styles from "./Navbar.module.scss";
 import { Toggle } from "@/shared/ui/toggle";
 import { useState, useEffect, useRef, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { LocationFilter, MapSearchPopup, useLocationSearch } from "@/features/filter-location";
 import { CategoryFilter } from "@/features/filter-category";
 import { PriceFilter } from "@/features/filter-price";
@@ -18,11 +19,71 @@ export function Navbar() {
   const { withinId, type, rentType, rent, showPriceOnRequest, near, bbox, setRentType, setWithinId } = useFiltersStore();
   const { setRequest } = useTenementStore();
   const navbarRef = useRef<HTMLElement>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  // Helpers to serialize/deserialize filters to URL
+  const buildQueryFromFilters = (opts: {
+    withinId?: string[];
+    type?: number[];
+    rentType?: ("rent" | "buy")[];
+    rent?: [number, number] | undefined;
+    showPriceOnRequest?: boolean;
+    near?: { coordinates: [number, number]; radius?: number } | undefined;
+    bbox?: [number, number, number, number] | undefined;
+  }) => {
+    const params = new URLSearchParams();
+    if (opts.withinId && opts.withinId.length > 0) params.set("withinId", opts.withinId.join(","));
+    if (opts.type && opts.type.length > 0) params.set("type", opts.type.join(","));
+    if (opts.rentType && opts.rentType.length > 0) params.set("rentType", opts.rentType[0]);
+    if (opts.rent && (opts.rent[0] !== null || opts.rent[1] !== null)) params.set("rent", `${opts.rent[0]}-${opts.rent[1]}`);
+    if (typeof opts.showPriceOnRequest === "boolean") params.set("show", opts.showPriceOnRequest ? "1" : "0");
+    if (opts.near) {
+      const [lng, lat] = opts.near.coordinates;
+      const radius = opts.near.radius ?? 5000;
+      params.set("near", `${lng},${lat},${radius}`);
+    }
+    if (opts.bbox) {
+      const [minX, minY, maxX, maxY] = opts.bbox;
+      params.set("bbox", `${minX},${minY},${maxX},${maxY}`);
+    }
+    return params;
+  };
+
+  const parseFiltersFromQuery = () => {
+    const q = new URLSearchParams(searchParams?.toString() || "");
+    const nextWithinId = q.get("withinId")?.split(",").filter(Boolean) || [];
+    const nextType = (q.get("type")?.split(",").map((n) => parseInt(n, 10)).filter((n) => !Number.isNaN(n)) || []) as number[];
+    const nextRentType = (q.get("rentType") === "buy" || q.get("rentType") === "rent") ? (q.get("rentType") as "buy" | "rent") : undefined;
+    const rentRaw = q.get("rent");
+    const nextRent: [number, number] | undefined = rentRaw && rentRaw.includes("-")
+      ? (rentRaw.split("-").map((n) => parseInt(n, 10)) as [number, number])
+      : undefined;
+    const showRaw = q.get("show");
+    const nextShow = showRaw === "1" ? true : showRaw === "0" ? false : undefined;
+    const nearRaw = q.get("near");
+    let nextNear: { coordinates: [number, number]; radius?: number } | undefined = undefined;
+    if (nearRaw) {
+      const parts = nearRaw.split(",").map((n) => parseFloat(n));
+      if (parts.length >= 2 && parts.every((n) => !Number.isNaN(n))) {
+        nextNear = { coordinates: [parts[0], parts[1]], radius: parts[2] } as any;
+      }
+    }
+    const bboxRaw = q.get("bbox");
+    let nextBbox: [number, number, number, number] | undefined = undefined;
+    if (bboxRaw) {
+      const parts = bboxRaw.split(",").map((n) => parseFloat(n));
+      if (parts.length === 4 && parts.every((n) => !Number.isNaN(n))) {
+        nextBbox = [parts[0], parts[1], parts[2], parts[3]];
+      }
+    }
+
+    return { nextWithinId, nextType, nextRentType, nextRent, nextShow, nextNear, nextBbox };
+  };
+
   const locationSearchResults = useLocationSearch(locationSearchValue);
   const { data: boundaries } = usePopularBoundaries();
   const { data: allBoundaries } = useAllBoundaries();
 
-  // Get selected locations with IDs and names
   const selectedLocations = useMemo(() => {
     if (withinId.length === 0) return [];
 
@@ -42,18 +103,13 @@ export function Navbar() {
       }
     });
 
-    // Return locations in the order they appear in withinId
     return withinId
       .map(id => locationMap.get(id))
       .filter((loc): loc is { id: string; name: string } => loc !== undefined);
   }, [withinId, boundaries, allBoundaries]);
 
   const handleClearLocation = (locationId: string) => {
-    const newWithinId = withinId.filter(id => id !== locationId);
-    setWithinId(newWithinId);
-    if (newWithinId.length === 0) {
-      setLocationSearchValue("");
-    }
+    setWithinId([]);
   };
 
   const rentMode = rentType[0] || "rent";
@@ -76,15 +132,26 @@ export function Navbar() {
   }, [isExpanded]);
 
   useEffect(() => {
+    // On mount: read URL params and initialize filters + request
+    const { nextWithinId, nextType, nextRentType, nextRent, nextShow, nextNear, nextBbox } = parseFiltersFromQuery();
+    const setters = useFiltersStore.getState();
+    if (nextWithinId.length > 0) setters.setWithinId(nextWithinId);
+    if (nextType.length > 0) setters.setType(nextType);
+    if (nextRentType) setters.setRentType(nextRentType);
+    if (nextRent) setters.setRent(nextRent[0], nextRent[1]);
+    if (typeof nextShow === "boolean") setters.setShowPriceOnRequest(nextShow);
+    if (nextNear) setters.setNear(nextNear);
+    if (nextBbox) setters.setBbox(nextBbox);
+
     const request: TenementSearchRequest = {
       filter: {
-        withinId: withinId.length > 0 ? withinId : undefined,
-        type: type.length > 0 ? type : undefined,
-        rentType: rentType,
-        rent: rent[0] !== null || rent[1] !== null ? rent : undefined,
-        showPriceOnRequest: showPriceOnRequest,
-        near: near,
-        bbox: bbox,
+        withinId: (nextWithinId.length > 0 ? nextWithinId : withinId.length > 0 ? withinId : undefined),
+        type: (nextType.length > 0 ? nextType : (type.length > 0 ? type : undefined)),
+        rentType: (nextRentType ? [nextRentType] : rentType),
+        rent: nextRent ? nextRent : (rent[0] !== null || rent[1] !== null ? rent : undefined),
+        showPriceOnRequest: typeof nextShow === "boolean" ? nextShow : showPriceOnRequest,
+        near: nextNear ?? near,
+        bbox: nextBbox ?? bbox,
         sort: "most_recent"
       },
       paging: {
@@ -92,8 +159,8 @@ export function Navbar() {
         page: 1,
       },
     };
-
     setRequest(request);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleRentTypeChange = (value: "rent" | "buy") => {
@@ -113,14 +180,12 @@ export function Navbar() {
     const allLocations = [...(boundaries || []), ...(allBoundaries || [])];
     const searchLower = searchValue.toLowerCase().trim();
 
-    // First, try exact match
     for (const loc of allLocations) {
       const displayName = (loc.altName || loc.name).toLowerCase();
       if (displayName === searchLower) {
         return loc.id;
       }
 
-      // Check districts
       if (loc.children) {
         for (const child of loc.children) {
           const childDisplayName = (child.altName || child.name).toLowerCase();
@@ -131,14 +196,12 @@ export function Navbar() {
       }
     }
 
-    // Then, try partial match
     for (const loc of allLocations) {
       const displayName = (loc.altName || loc.name).toLowerCase();
       if (displayName.includes(searchLower) || searchLower.includes(displayName)) {
         return loc.id;
       }
 
-      // Check districts
       if (loc.children) {
         for (const child of loc.children) {
           const childDisplayName = (child.altName || child.name).toLowerCase();
@@ -153,7 +216,6 @@ export function Navbar() {
   };
 
   const handleSearch = () => {
-    // If there's a location search value typed but not selected, try to find the location ID
     let finalWithinId = withinId;
 
     if (locationSearchValue && locationSearchValue.trim().length > 0 && withinId.length === 0) {
@@ -163,6 +225,13 @@ export function Navbar() {
         setWithinId(finalWithinId);
         setLocationSearchValue("");
       }
+    }
+
+    // If there is a draft selection, apply it now
+    const { draftWithinId, applyDraft } = useFiltersStore.getState() as any;
+    if (draftWithinId && draftWithinId.length > 0) {
+      applyDraft();
+      finalWithinId = draftWithinId;
     }
 
     const request: TenementSearchRequest = {
@@ -183,6 +252,17 @@ export function Navbar() {
     };
 
     setRequest(request);
+    // Update URL with applied filters for shareable link
+    const params = buildQueryFromFilters({
+      withinId: request.filter.withinId,
+      type: request.filter.type,
+      rentType: request.filter.rentType as any,
+      rent: request.filter.rent as any,
+      showPriceOnRequest: request.filter.showPriceOnRequest,
+      near: request.filter.near,
+      bbox: request.filter.bbox,
+    });
+    router.replace(`?${params.toString()}`);
     setOpen(null);
   };
 
@@ -256,7 +336,6 @@ export function Navbar() {
                             </svg>
                           </button>
                         </div>
-
                       </>
                     );
                   })()}
@@ -290,26 +369,10 @@ export function Navbar() {
                   results={locationSearchResults}
                   onClose={() => setOpen(null)}
                   onSelectLocation={(locationId, locationName) => {
-                    const { setWithinId, type, rent, rentType, showPriceOnRequest } = useFiltersStore.getState();
-                    setWithinId([locationId]);
+                    const { setDraftWithinId } = useFiltersStore.getState() as any;
+                    setDraftWithinId([locationId]);
                     setLocationSearchValue("");
                     setOpen(null);
-
-                    // Trigger search with new filters
-                    const request: TenementSearchRequest = {
-                      filter: {
-                        withinId: [locationId],
-                        type: type.length > 0 ? type : undefined,
-                        rent: rent[0] > 0 || rent[1] < 9999 ? [rent[0], rent[1]] : undefined,
-                        rentType,
-                        showPriceOnRequest,
-                      },
-                      paging: {
-                        page: 1,
-                        pageSize: 20,
-                      },
-                    };
-                    setRequest(request);
                   }}
                 />
               </div>
