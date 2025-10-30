@@ -1,0 +1,45 @@
+.root {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.checkbox {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid #d1d1d6;
+  border-radius: 3px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+
+  &:hover {
+    border-color: #a540f3;
+  }
+}
+
+.checkbox.checked {
+  background: #a540f3;
+  border-color: #a540f3;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.6;
+  color: #0e0e0e;
+}
+

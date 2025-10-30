@@ -1,0 +1,38 @@
+[
+    {
+        "id": 2,
+        "name": "Apartments"
+    },
+    {
+        "id": 3,
+        "name": "Houses"
+    },
+    {
+        "id": 1,
+        "name": "Rooms/Co-Living"
+    },
+    {
+        "id": 4,
+        "name": "Plots"
+    },
+    {
+        "id": 20,
+        "name": "Office"
+    },
+    {
+        "id": 5,
+        "name": "Commercial"
+    },
+    {
+        "id": 12,
+        "name": "New Developments"
+    },
+    {
+        "id": 11,
+        "name": "Holiday Homes"
+    },
+    {
+        "id": 13,
+        "name": "Parking"
+    }
+]

@@ -1,0 +1,39 @@
+.root {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 260px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06), 0 16px 32px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(165, 64, 243, 0.12);
+  padding: 0;
+  z-index: 100;
+  max-height: 490px;
+  overflow: hidden;
+}
+
+.section {
+  padding: 12px;
+}
+
+.sectionTitle {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.6;
+  color: #79767d;
+  margin-bottom: 8px;
+  padding: 0 0 8px 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+}

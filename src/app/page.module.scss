@@ -1,0 +1,51 @@
+.main {
+  display: flex;
+  min-height: calc(100vh - 80px);
+  background: #fff;
+  position: relative;
+}
+
+.mapPlaceholder {
+  flex: 1;
+  min-width: 0;
+  background: #d9d9d9;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #79767d;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+@media (max-width: 600px) {
+  .mapPlaceholder {
+    display: none;
+  }
+}
+
+.listingsPanel {
+  width: 731px;
+  flex-shrink: 0;
+  background: #fff;
+  overflow-y: auto;
+  overflow-x: hidden;
+  
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(14, 14, 14, 0.1);
+    border-radius: 8px;
+    
+    &:hover {
+      background: rgba(14, 14, 14, 0.2);
+    }
+  }
+}
+
